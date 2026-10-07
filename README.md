@@ -2,11 +2,11 @@
 
 Aplikasi sederhana untuk membuat task, mengubah status task secara berurutan, dan melihat riwayat perubahan (audit log) per task.
 
-Stack: React + TypeScript (frontend), Node.js + Express + TypeScript (backend) dan dites dengan Node.js 22 di dua terminal.
+Stack: React + TypeScript (frontend), Node.js + Express + TypeScript (backend).
 
 ## Cara menjalankan
 
-Butuh Node.js 18 atau lebih baru. Jalankan di dua terminal.
+Dites dengan Node.js 22. Jalankan di dua terminal.
 
 ```bash
 # Terminal 1: backend (http://localhost:4000)
@@ -27,7 +27,7 @@ Buka `http://localhost:5173`. Backend harus jalan lebih dulu.
 - `backend/src/store.ts`: logika domain. Menyimpan task, aturan urutan status, dan audit log. Tidak tahu apa-apa soal HTTP.
 - `backend/src/index.ts`: route Express. Memvalidasi input, memanggil `store`, dan mengubah `DomainError` menjadi kode HTTP (400, 404, 422).
 - `frontend/src/api.ts`: satu fungsi `call` untuk semua permintaan ke backend, termasuk penanganan pesan error.
-- `frontend/src/App.tsx`: tampilan. Riwayat per task muncul sebagai daftar yang dibuka lewat tombol History.
+- `frontend/src/App.tsx` dan `App.css`: tampilan. Tiap task adalah kartu berwarna dengan bilah progres sesuai status, dan tombol aksi hanya menawarkan status berikutnya. Riwayat per task dibuka lewat tombol History dan tampil sebagai garis waktu.
 
 API:
 
@@ -43,6 +43,7 @@ API:
 ## Asumsi
 
 - Actor dipilih dari daftar yang ditulis tetap di backend (dropdown di UI) dan dikirim pada setiap permintaan tulis. Tidak ada autentikasi.
+- Backend memvalidasi `actor` terhadap daftar tersebut dan menolak nilai lain dengan 400. Untuk `DELETE`, actor dikirim lewat body JSON.
 - Task baru selalu dimulai dari `to_do`. Status hanya boleh maju satu langkah: `to_do → pending → in_progress → done`. `done` adalah status akhir.
 - Pembuatan dan penghapusan task juga dicatat di audit log (`created`, `deleted`), supaya riwayat lengkap. Soal hanya mewajibkan perubahan status, jadi ini tambahan.
 - Log milik task yang sudah dihapus tetap bisa dibaca lewat `/tasks/:id/audit-logs`.
@@ -54,12 +55,14 @@ API:
 - **Tipe data diduplikasi** antara frontend dan backend, tidak memakai package bersama, karena skala tugas ini kecil.
 - **Validasi alur status ada di backend.** Frontend hanya menawarkan tombol "status berikutnya". Backend tetap sumber kebenaran, jadi permintaan langsung ke API pun tetap divalidasi.
 - **Alamat API ditulis tetap** (`http://localhost:4000`) di `api.ts`, bukan lewat environment variable.
+- **CORS dibuka untuk semua origin** (`cors()` tanpa batasan) supaya frontend di port berbeda bisa mengakses API saat pengembangan. Di produksi harus dibatasi ke origin yang dikenal.
 - **Belum ada test otomatis.** Pengujian dilakukan manual (lihat bagian AI).
 
 ## Jika ada waktu lebih
 
 - Simpan data ke Postgres.
 - Test otomatis untuk urutan status, idempotency, dan audit log yang tidak bisa diubah.
+- Paket tipe bersama untuk frontend dan backend, supaya tidak diduplikasi.
 - Pengecekan versi saat update (misalnya mengirim status yang diharapkan), agar dua pengguna tidak bisa memajukan task yang sama bersamaan.
 - Pagination untuk audit log dan penanganan error jaringan yang lebih baik di UI.
 
@@ -86,7 +89,8 @@ Lapisan penyimpanan. Saya akan memisahkan `store.ts` menjadi antarmuka repositor
 ## Penggunaan AI
 
 Saya memakai Claude untuk memandu pengerjaan secara bertahap: merancang model data, menjelaskan konsep (indeks array, `as const`, `Object.freeze`, error HTTP), dan membantu menulis serta memperbaiki kode `store.ts`, route Express, dan komponen React. Saya memvalidasi hasilnya dengan:
-- menjalankan skrip tes manual untuk `store.ts` (maju satu langkah, status sama tidak membuat log, lompat dan mundur ditolak, hapus tidak menghapus log);
-- mengetes API dengan PowerShell (buat task, ubah status, kirim status sama, lompat status, lihat log);
+- menjalankan skrip tes sementara untuk `store.ts` (maju satu langkah, status sama tidak membuat log, lompat dan mundur ditolak, hapus tidak menghapus log);
+- mengetes API dengan PowerShell (buat task, ubah status, kirim status sama, lompat status, actor tidak valid ditolak 400, hapus task lalu memastikan lognya masih ada);
 - mengetes UI di browser (tombol status, hapus, riwayat per task, ganti actor);
+- menjalankan `npm run build` pada frontend untuk memastikan tidak ada error tipe;
 - memperbaiki error yang muncul (konfigurasi `tsconfig`, fungsi `call` di `api.ts`).
